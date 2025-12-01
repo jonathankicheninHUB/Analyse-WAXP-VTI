@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyse Dynamique WAXP - Valeur Intrinsèque (VTI)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Fond très sombre (slate-900) */
+            color: #e2e8f0; /* Texte clair */
+        }
+        .card {
+            background-color: #1e293b; /* Fond de carte sombre (slate-800) */
+            border-radius: 16px; /* Plus arrondi */
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4), 0 4px 6px rgba(0, 0, 0, 0.2);
+            padding: 28px; /* Plus de padding */
+            transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease; /* Transition sur la carte */
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.6);
+        }
+        .metric-value {
+            font-size: 2.75rem; /* Légèrement plus grand */
+            font-weight: 800;
+            line-height: 1.1;
+            transition: color 0.5s ease; /* Transition de couleur */
+        }
+        /* Style des réglettes */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #4fd1c5; /* Cyan vif */
+            cursor: pointer;
+            box-shadow: 0 0 0 4px rgba(79, 209, 197, 0.5);
+            transition: background-color 0.3s;
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #4fd1c5;
+            cursor: pointer;
+        }
+        input[type=range] {
+            width: 100%;
+            height: 10px; /* Plus épais */
+            background: #334155; /* Gris sombre pour la piste */
+            border-radius: 5px;
+            -webkit-appearance: none;
+            margin-top: 10px;
+        }
+        .risk-metric {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+        /* Animation pour les mises à jour des métriques */
+        @keyframes pulse-highlight {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(79, 209, 197, 0.7); }
+            50% { transform: scale(1.02); box-shadow: 0 0 20px 5px rgba(79, 209, 197, 0.5); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(79, 209, 197, 0); }
+        }
+
+        .pulse-effect {
+            animation: pulse-highlight 0.5s ease-out;
+        }
+        
+        .slider-group {
+            transition: background-color 0.3s ease;
+        }
+        .slider-group:hover {
+            background-color: #2d3748; /* Slight darker hover for groups */
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-8">
+            <h1 class="text-5xl font-extrabold text-cyan-400 mb-2">
+                Analyse WAXP VTI : Simulation en Temps Réel
+            </h1>
+            <p class="text-gray-400">
+                Ajustez les paramètres pour visualiser l'impact sur la Valeur Intrinsèque Théorique (VTI) et le risque de marché.
+            </p>
+        </header>
+
+        <!-- Section 1: Métriques Clés et Contrôles -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-10">
+            <!-- Prix Actuel & Market Cap -->
+            <div class="card col-span-1 border-l-4 border-cyan-400">
+                <p class="text-lg font-medium text-gray-400">Prix Marché Actuel</p>
+                <p class="metric-value text-green-400">$0.009</p>
+                <p class="text-sm text-gray-500">Market Cap: $44 M</p>
+            </div>
+            
+            <!-- VTI CALCULÉE (Animation & Focus) -->
+            <div id="vti-card" class="card col-span-1 border-l-4 border-pink-400">
+                <p class="text-lg font-medium text-gray-400">VTI Calculée</p>
+                <p id="vti-result" class="metric-value text-pink-400">$0.000000</p>
+                <p class="text-sm text-gray-500">MC Justifiée (Utilité): <span id="mc-justified">$0.0 M</span></p>
+            </div>
+            
+            <!-- Écart (Animation & Focus) -->
+            <div id="delta-card" class="card col-span-1 border-l-4 border-yellow-400">
+                <p class="text-lg font-medium text-gray-400">Écart vs Prix Actuel</p>
+                <p id="delta-percent" class="metric-value text-yellow-400">0.0%</p>
+                <p class="text-sm text-gray-500">Total UUR (Net Bots): <span id="total-uur">250,000</span></p>
+            </div>
+            
+            <!-- Risque de Liquidité -->
+            <div class="card col-span-1 border-l-4 border-red-500">
+                <p class="text-lg font-medium text-gray-400">Pression de Vente Potentielle</p>
+                <p id="liquidity-risk-usd" class="risk-metric text-red-400">$0.0 M</p>
+                <p class="text-sm text-gray-500">Volume de WAXP à risque: <span id="liquidity-risk-waxp">0 M</span> WAXP</p>
+            </div>
+        </div>
+
+        <!-- Section 2: Réglettes de Simulation (Regroupées pour la lisibilité) -->
+        <div class="card mb-10">
+            <h2 class="text-3xl font-extrabold mb-6 text-cyan-400">Réglettes de Simulation</h2>
+
+            <!-- GROUPE 1: Facteurs de Valeur Intrinsèque (VTI) -->
+            <div class="slider-group p-6 mb-8 bg-gray-700/30 rounded-xl border-l-4 border-yellow-300">
+                <h3 class="text-xl font-bold text-yellow-300 mb-4">Facteurs de Valeur Intrinsèque (VTI)</h3>
+                
+                <!-- Réglette 0: Coût Annuel d'Utilité (CAU) - Prominent -->
+                <div class="mb-6 pb-4 border-b border-gray-600">
+                    <label for="cau-slider" class="block font-extrabold text-xl text-yellow-300 mb-2">
+                        0. Coût Annuel d'Utilité (CAU)
+                    </label>
+                    <input type="range" id="cau-slider" min="1" max="100" step="1" value="10">
+                    <p class="text-sm text-gray-400 mt-2">
+                        Valeur ($ USD) attribuée à chaque Utilisateur Unique Réel (UUR Net) par an. : 
+                        <span id="cau-value" class="font-bold text-yellow-300">$10</span>
+                    </p>
+                </div>
+
+                <!-- UUR Grouped Sliders -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <!-- Réglette 1: UUR Base -->
+                    <div>
+                        <label for="uur-base-slider" class="block font-medium text-lg text-gray-300 mb-2">
+                            1. Utilisateurs Actifs Initiaux (UUR Base)
+                        </label>
+                        <input type="range" id="uur-base-slider" min="50000" max="1500000" step="10000" value="1000000">
+                        <p class="text-sm text-gray-400 mt-2">
+                            <span id="uur-base-value" class="font-bold text-cyan-400">1,000,000</span> UUR
+                        </p>
+                    </div>
+
+                    <!-- Réglette 2: Estimation des Bots -->
+                    <div>
+                        <label for="bot-percent-slider" class="block font-medium text-lg text-gray-300 mb-2">
+                            2. Taux d'Estimation des Bots
+                        </label>
+                        <input type="range" id="bot-percent-slider" min="20" max="80" step="5" value="50">
+                        <p class="text-sm text-gray-400 mt-2">
+                            <span id="bot-percent-value" class="font-bold text-cyan-400">50%</span>
+                        </p>
+                    </div>
+                    
+                    <!-- Réglette 3: Croissance Nouveaux UUR (DoV) -->
+                    <div>
+                        <label for="dov-growth-slider" class="block font-medium text-lg text-gray-300 mb-2">
+                            3. Croissance Nouveaux UUR (DoV)
+                        </label>
+                        <input type="range" id="dov-growth-slider" min="100" max="200000" step="100" value="50000">
+                        <p class="text-sm text-gray-400 mt-2">
+                            <span id="dov-growth-value" class="font-bold text-cyan-400">50,000</span> UUR
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GROUPE 2: Facteurs de Dilution et de Risque -->
+            <div class="slider-group p-6 bg-gray-700/30 rounded-xl border-l-4 border-pink-400">
+                <h3 class="text-xl font-bold text-pink-400 mb-4">Facteurs de Dilution (DMS) et Risque de Liquidité</h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                    <!-- Réglette 4: Staking Minimum par UUR (CPU/NET) -->
+                    <div>
+                        <label for="staking-cost-slider" class="block font-medium text-lg text-gray-300 mb-2">
+                            4. Staking Minimum UUR (WAXP min/wallet)
+                        </label>
+                        <input type="range" id="staking-cost-slider" min="20" max="200" step="5" value="50">
+                        <p class="text-sm text-gray-400 mt-2">
+                            <span id="staking-cost-value" class="font-bold text-pink-400">50</span> WAXP requis
+                        </p>
+                    </div>
+
+                    <!-- Réglette 5: Staking RPC/Infrastructure & Vote Passif -->
+                    <div>
+                        <label for="rpc-staking-slider" class="block font-medium text-lg text-gray-300 mb-2">
+                            5. Staking RPC/Vote/Infra (Bloqué)
+                        </label>
+                        <input type="range" id="rpc-staking-slider" min="1000000" max="3000000000" step="100000000" value="1500000000">
+                        <p class="text-sm text-gray-400 mt-2">
+                            <span id="rpc-staking-value" class="font-bold text-pink-400">1,500,000,000</span> WAXP bloqué
+                        </p>
+                    </div>
+
+                    <!-- Réglette 6: WAXP Moyen par UUR (AFK inclus) -->
+                    <div>
+                        <label for="avg-waxp-slider" class="block font-medium text-lg text-gray-300 mb-2">
+                            6. WAXP Moyen par Utilisateur (AFK inclus)
+                        </label>
+                        <input type="range" id="avg-waxp-slider" min="500" max="50000" step="500" value="10000">
+                        <p class="text-sm text-gray-400 mt-2">
+                            <span id="avg-waxp-value" class="font-bold text-red-400">10,000</span> WAXP détenu
+                        </p>
+                    </div>
+
+                    <!-- Réglette 7: Pourcentage de Liquidation AFK -->
+                    <div>
+                        <label for="afk-liquidation-slider" class="block font-medium text-lg text-gray-300 mb-2">
+                            7. Taux de Liquidation des Comptes AFK
+                        </label>
+                        <input type="range" id="afk-liquidation-slider" min="0" max="100" step="5" value="10">
+                        <p class="text-sm text-gray-400 mt-2">
+                            <span id="afk-liquidation-value" class="font-bold text-red-400">10%</span> liquidé
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 3: Visualisation de la Dilution et Upside -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Dilution Effect -->
+            <div class="card">
+                <h2 class="text-2xl font-semibold mb-4 text-cyan-400">L'Effet de Dilution Structurelle (DMS - WAXP Bloqué)</h2>
+                <p class="text-gray-400 mb-4">Le rôle de WAXP en tant qu'infrastructure: Le DMS est la Demande Minimale de Staking requise pour le fonctionnement du réseau.</p>
+
+                <div class="relative h-12">
+                    <div class="absolute inset-0 bg-red-800 rounded-lg flex items-center p-2 opacity-80">
+                        <span class="text-sm font-semibold text-red-200">Offre Circulante (OC) : <span id="oc-display">4.5 Milliards</span> WAXP</span>
+                    </div>
+                    <!-- DMS bar (updated by JS with transition) -->
+                    <div id="dms-bar" class="absolute top-0 left-0 bg-lime-400 h-full rounded-lg transition-all duration-500 ease-in-out" style="width: 0%;">
+                        <span id="dms-label" class="text-xs absolute right-0 top-1/2 transform -translate-y-1/2 text-lime-900 font-bold ml-2 whitespace-nowrap pr-2"></span>
+                    </div>
+                </div>
+                <p class="text-xs mt-3 text-gray-500">WAXP effectivement en circulation (OC - DMS) : <span id="effective-oc-display" class="font-bold text-lime-400">0.0 Milliards</span> WAXP</p>
+            </div>
+
+            <!-- Upside Scenario Dynamic -->
+            <div class="card bg-indigo-900/50">
+                <h2 class="text-2xl font-semibold mb-4 text-cyan-400">Potentiel Haussier (Scénario Optimal)</h2>
+                <p class="text-gray-400 mb-6" id="upside-scenario-assumptions">
+                    **Scénario Cible :** <span id="upside-uur-mult">2.0x UUR Net</span>, 
+                    <span id="upside-cau-mult">1.5x CAU</span>, 
+                    <span id="upside-burn-rate">50% Burn de l'OC</span>.
+                </p>
+                
+                <div class="mt-6 p-6 bg-indigo-700/70 rounded-xl text-center shadow-lg">
+                    <p class="text-lg font-medium text-cyan-300">VTI Cible Calculée</p>
+                    <p id="upside-vti-result" class="text-5xl font-extrabold text-white transition-all duration-300">$0.0000</p>
+                    <p class="text-base text-indigo-300 mt-2">Potentiel de gain : <span id="upside-delta" class="text-xl font-bold text-yellow-300">0.0x</span></p>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-10 text-center text-sm text-gray-500 p-4">
+            <p>Méthodologie VTI Révisée : VTI = (UUR Net x CAU) / (Offre Circulante - DMS WAXP). CAU est le Coût Annuel d'Utilité en $ USD.</p>
+            <p>Demande Minimale de Staking (DMS) = (UUR Base x Staking UUR) + Staking RPC/Infra.</p>
+            <p>Risque Liquidité = (WAXP Moyen x UUR Base) x Taux Liquidation AFK x Prix Actuel</p>
+        </footer>
+
+    </div>
+
+    <script>
+        // --- CONSTANTES CLÉS (Basées sur l'analyse) ---
+        const OC_WAXP = 4500000000; // Offre Circulante WAXP
+        const CURRENT_PRICE = 0.009; // Prix Marché Actuel
+
+        // --- CONSTANTES DE SCÉNARIO HAUSSIER (Formule demandée) ---
+        const UPSIDE_UUR_MULTIPLIER = 2.0; // 2x UUR Net
+        const UPSIDE_CAU_MULTIPLIER = 1.5; // 1.5x CAU
+        const UPSIDE_BURN_RATE = 0.50; // 50% de l'OC brûlé
+
+        // --- ÉLÉMENTS DU DOM ---
+        const vtiCard = document.getElementById('vti-card'); // Pour l'animation
+        const deltaCard = document.getElementById('delta-card'); // Pour l'animation
+        const cauSlider = document.getElementById('cau-slider');
+        const cauValueDisplay = document.getElementById('cau-value');
+        const uurBaseSlider = document.getElementById('uur-base-slider');
+        const botPercentSlider = document.getElementById('bot-percent-slider');
+        const dovGrowthSlider = document.getElementById('dov-growth-slider');
+        const stakingCostSlider = document.getElementById('staking-cost-slider');
+        const rpcStakingSlider = document.getElementById('rpc-staking-slider'); 
+        const avgWaxpSlider = document.getElementById('avg-waxp-slider');
+        const afkLiquidationSlider = document.getElementById('afk-liquidation-slider');
+
+        const uurBaseValue = document.getElementById('uur-base-value');
+        const botPercentValue = document.getElementById('bot-percent-value');
+        const dovGrowthValue = document.getElementById('dov-growth-value');
+        const stakingCostValue = document.getElementById('staking-cost-value');
+        const rpcStakingValue = document.getElementById('rpc-staking-value'); 
+        const avgWaxpValue = document.getElementById('avg-waxp-value');
+        const afkLiquidationValue = document.getElementById('afk-liquidation-value');
+
+        const vtiResult = document.getElementById('vti-result');
+        const mcJustified = document.getElementById('mc-justified');
+        const totalUUR = document.getElementById('total-uur');
+        const deltaPercent = document.getElementById('delta-percent');
+        const dmsBar = document.getElementById('dms-bar');
+        const dmsLabel = document.getElementById('dms-label');
+        const liquidityRiskUsd = document.getElementById('liquidity-risk-usd'); 
+        const liquidityRiskWaxp = document.getElementById('liquidity-risk-waxp'); 
+        const ocDisplay = document.getElementById('oc-display');
+        const effectiveOcDisplay = document.getElementById('effective-oc-display');
+        const upsideVtiResult = document.getElementById('upside-vti-result');
+        const upsideDelta = document.getElementById('upside-delta');
+        const upsideUurMult = document.getElementById('upside-uur-mult');
+        const upsideCauMult = document.getElementById('upside-cau-mult');
+        const upsideBurnRate = document.getElementById('upside-burn-rate');
+
+
+        // --- FONCTIONS UTILITAIRES ---
+        // Fonction pour formater les nombres en Millions ou Milliards avec la précision demandée
+        function formatLargeNumber(number, decimals = 1) {
+            if (number >= 1000000000) {
+                return (number / 1000000000).toFixed(decimals) + ' Milliards';
+            }
+            if (number >= 1000000) {
+                return (number / 1000000).toFixed(decimals) + ' Millions';
+            }
+            return number.toLocaleString('fr-FR');
+        }
+
+        // Fonction pour animer les cartes de métrique
+        function animateMetricUpdate(element) {
+            element.classList.remove('pulse-effect');
+            // Force reflow pour redémarrer l'animation
+            void element.offsetWidth; 
+            element.classList.add('pulse-effect');
+        }
+
+        // --- FONCTION DE CALCUL HAUSSIER ---
+        function calculateUpsideScenario(currentUUR, currentCAU, currentPrice, totalOC) {
+            const targetUUR = currentUUR * UPSIDE_UUR_MULTIPLIER;
+            const targetCAU = currentCAU * UPSIDE_CAU_MULTIPLIER;
+            const targetMCJustifiedUSD = targetUUR * targetCAU;
+            const targetOC = totalOC * (1 - UPSIDE_BURN_RATE); 
+            const targetVTI = targetMCJustifiedUSD / targetOC;
+            const gainMultiple = targetVTI / currentPrice;
+
+            return {
+                vti: targetVTI,
+                gainMultiple: gainMultiple
+            };
+        }
+
+
+        // --- FONCTION DE CALCUL PRINCIPALE ---
+        function calculateVTI() {
+            // Lecture des valeurs des réglettes
+            const cauUSD = parseInt(cauSlider.value);
+            const uurBase = parseInt(uurBaseSlider.value);
+            const botPercent = parseFloat(botPercentSlider.value) / 100;
+            const dovNewUsers = parseInt(dovGrowthSlider.value);
+            const minStakingWAXP = parseInt(stakingCostSlider.value); 
+            const rpcStakingWAXP = parseInt(rpcStakingSlider.value); 
+            const avgWaxpPerUUR = parseInt(avgWaxpSlider.value);
+            const afkLiquidationRate = parseFloat(afkLiquidationSlider.value) / 100;
+
+            // Mise à jour des labels des réglettes (avec formatage)
+            cauValueDisplay.textContent = `$${cauUSD}`;
+            uurBaseValue.textContent = uurBase.toLocaleString('fr-FR');
+            botPercentValue.textContent = `${(botPercent * 100).toFixed(0)}%`;
+            dovGrowthValue.textContent = dovNewUsers.toLocaleString('fr-FR');
+            stakingCostValue.textContent = minStakingWAXP.toLocaleString('fr-FR');
+            rpcStakingValue.textContent = formatLargeNumber(rpcStakingWAXP, 0); // Pas de décimales pour les WAXP
+            avgWaxpValue.textContent = avgWaxpPerUUR.toLocaleString('fr-FR');
+            afkLiquidationValue.textContent = `${(afkLiquidationRate * 100).toFixed(0)}%`;
+
+            // 1. Calcul des UUR Net
+            const uurNetInitial = uurBase * (1 - botPercent);
+            const finalUUR = Math.max(0, uurNetInitial + dovNewUsers); 
+
+            // 2. Calcul du DMS (Demande Minimale de Staking)
+            const stakingUurBase = uurBase * minStakingWAXP;
+            const dmsWAXP = stakingUurBase + rpcStakingWAXP; 
+
+            // 3. Calcul de la Market Cap Justifiée (VTI)
+            const mcJustifiedUSD = finalUUR * cauUSD;
+            const effectiveOC = Math.max(1, OC_WAXP - dmsWAXP);
+            const newVTI = mcJustifiedUSD / effectiveOC;
+
+            // 4. Calcul du Risque de Liquidité
+            const totalWaxpHeld = uurBase * avgWaxpPerUUR;
+            const potentialSellingWaxp = totalWaxpHeld * afkLiquidationRate;
+            const potentialSellingUSD = potentialSellingWaxp * CURRENT_PRICE;
+
+            // 5. Calcul du % de DMS
+            const dmsPercent = (dmsWAXP / OC_WAXP) * 100;
+
+            // 6. Calcul de l'écart avec le prix actuel
+            const delta = ((newVTI - CURRENT_PRICE) / CURRENT_PRICE) * 100;
+            
+            // 7. Calcul du Potentiel Haussier (Upside Scenario)
+            const upside = calculateUpsideScenario(finalUUR, cauUSD, CURRENT_PRICE, OC_WAXP);
+
+
+            // --- MISE À JOUR DU DOM ---
+            
+            // Applique l'animation à la carte VTI et Delta
+            animateMetricUpdate(vtiCard);
+            animateMetricUpdate(deltaCard);
+
+            // Mise à jour VTI & MC
+            vtiResult.textContent = `$${newVTI.toFixed(6)}`; // 6 décimales pour la précision
+            mcJustified.textContent = `$${(mcJustifiedUSD / 1000000).toFixed(1)} M`;
+            totalUUR.textContent = finalUUR.toLocaleString('fr-FR');
+
+            // Mise à jour des affichages d'offre
+            ocDisplay.textContent = formatLargeNumber(OC_WAXP, 1);
+            effectiveOcDisplay.textContent = formatLargeNumber(effectiveOC, 1);
+
+
+            // Mise à jour de l'écart (avec couleur dynamique)
+            deltaPercent.textContent = `${delta.toFixed(1)}%`;
+            if (delta > 0) {
+                deltaPercent.classList.remove('text-red-400', 'text-yellow-400');
+                deltaPercent.classList.add('text-green-400');
+            } else if (delta < -10) {
+                deltaPercent.classList.remove('text-green-400', 'text-yellow-400');
+                deltaPercent.classList.add('text-red-400');
+            } else {
+                deltaPercent.classList.remove('text-green-400', 'text-red-400');
+                deltaPercent.classList.add('text-yellow-400');
+            }
+
+            // Mise à jour Risque Liquidité
+            liquidityRiskUsd.textContent = `$${(potentialSellingUSD / 1000000).toFixed(1)} M`;
+            liquidityRiskWaxp.textContent = `${(potentialSellingWaxp / 1000000).toFixed(1)} M`;
+
+            // Mise à jour de la barre de Dilution (DMS)
+            const dmsMaxDisplay = OC_WAXP * 0.9;
+            const dmsDisplayRatio = Math.min(100, (dmsWAXP / dmsMaxDisplay) * 100); 
+
+            dmsBar.style.width = `${dmsDisplayRatio}%`;
+            dmsLabel.textContent = `${(dmsPercent).toFixed(2)}% de l'OC Bloqué (${formatLargeNumber(dmsWAXP, 0)} WAXP)`;
+
+            // Mise à jour du Potentiel Haussier (Upside)
+            upsideVtiResult.textContent = `$${upside.vti.toFixed(4)}`;
+            upsideDelta.textContent = `${upside.gainMultiple.toFixed(2)}x`;
+            
+            // Mise à jour des hypothèses pour plus de clarté
+            upsideUurMult.textContent = `${UPSIDE_UUR_MULTIPLIER}x UUR Net`;
+            upsideCauMult.textContent = `${UPSIDE_CAU_MULTIPLIER}x CAU`;
+            upsideBurnRate.textContent = `${UPSIDE_BURN_RATE * 100}% Burn de l'OC`;
+        }
+
+        // --- ÉVÉNEMENTS ---
+        const sliders = [cauSlider, uurBaseSlider, botPercentSlider, dovGrowthSlider, stakingCostSlider, rpcStakingSlider, avgWaxpSlider, afkLiquidationSlider];
+        sliders.forEach(slider => slider.addEventListener('input', calculateVTI)); 
+
+        // Initialisation avec les valeurs par défaut
+        calculateVTI(); 
+
+    </script>
+</body>
+</html>
