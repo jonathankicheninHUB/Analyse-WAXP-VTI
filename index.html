@@ -141,16 +141,34 @@
             <div class="slider-group p-6 mb-8 bg-gray-700/30 rounded-xl border-l-4 border-yellow-300">
                 <h3 class="text-xl font-bold text-yellow-300 mb-4">Facteurs de Valeur Intrinsèque (VTI)</h3>
                 
-                <!-- Réglette 0: Coût Annuel d'Utilité (CAU) - Prominent -->
-                <div class="mb-6 pb-4 border-b border-gray-600">
-                    <label for="cau-slider" class="block font-extrabold text-xl text-yellow-300 mb-2">
-                        0. Coût Annuel d'Utilité (CAU)
-                    </label>
-                    <input type="range" id="cau-slider" min="1" max="100" step="1" value="10">
-                    <p class="text-sm text-gray-400 mt-2">
-                        Valeur ($ USD) attribuée à chaque Utilisateur Unique Réel (UUR Net) par an. : 
-                        <span id="cau-value" class="font-bold text-yellow-300">$10</span>
-                    </p>
+                <!-- RANGÉE DES FACTEURS USD -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6 pb-4 border-b border-gray-600">
+                    
+                    <!-- Réglette 0: Coût Annuel d'Utilité (CAU) -->
+                    <div>
+                        <label for="cau-slider" class="block font-extrabold text-xl text-yellow-300 mb-2">
+                            0. Coût Annuel d'Utilité (CAU)
+                        </label>
+                        <input type="range" id="cau-slider" min="1" max="100" step="1" value="10">
+                        <p class="text-sm text-gray-400 mt-2">
+                            Valeur ($ USD) attribuée à chaque Utilisateur Unique Réel (UUR Net) par an. : 
+                            <span id="cau-value" class="font-bold text-yellow-300">$10</span>
+                        </p>
+                    </div>
+
+                    <!-- NOUVELLE RÉGLETTE: Rachat Annuel DoV (USD) -->
+                    <div>
+                        <label for="dov-buyback-slider" class="block font-extrabold text-xl text-yellow-300 mb-2">
+                            0.B Rachat Annuel WAXP (DoV)
+                        </label>
+                        <!-- Plage de 0 à 500k USD, step 10k -->
+                        <input type="range" id="dov-buyback-slider" min="0" max="500000" step="10000" value="100000">
+                        <p class="text-sm text-gray-400 mt-2">
+                            Montant annuel en USD pour le drop de packs : 
+                            <span id="dov-buyback-value" class="font-bold text-yellow-300">$100,000</span>
+                        </p>
+                    </div>
+
                 </div>
 
                 <!-- UUR Grouped Sliders -->
@@ -306,7 +324,8 @@
         </div>
 
         <footer class="mt-10 text-center text-sm text-gray-500 p-4">
-            <p>Méthodologie VTI Révisée : VTI = (UUR Net x CAU) / (Offre Circulante - DMS WAXP). CAU est le Coût Annuel d'Utilité en $ USD.</p>
+            <p>Méthodologie VTI Révisée : VTI = (MC Justifiée) / (Offre Circulante - DMS WAXP).</p>
+            <p>MC Justifiée (Utilité) = (UUR Net x CAU) + Rachat Annuel DoV.</p>
             <p>Demande Minimale de Staking (DMS) = (UUR Base x Staking UUR) + Staking RPC/Infra.</p>
             <p>Risque Liquidité = (WAXP Moyen x UUR Base) x Taux Liquidation AFK x Prix Actuel</p>
         </footer>
@@ -335,6 +354,10 @@
         
         const cauSlider = document.getElementById('cau-slider');
         const cauValueDisplay = document.getElementById('cau-value');
+        // NOUVELLE RÉGLETTE
+        const dovBuybackSlider = document.getElementById('dov-buyback-slider');
+        const dovBuybackValueDisplay = document.getElementById('dov-buyback-value');
+
         const uurBaseSlider = document.getElementById('uur-base-slider');
         const botPercentSlider = document.getElementById('bot-percent-slider');
         const dovGrowthSlider = document.getElementById('dov-growth-slider');
@@ -381,6 +404,15 @@
             return number.toLocaleString('fr-FR');
         }
 
+        // Fonction pour formater les montants USD
+        function formatUSD(amount) {
+             if (amount >= 1000000) {
+                return `$${(amount / 1000000).toFixed(1)} M`;
+            }
+            return `$${amount.toLocaleString('fr-FR')}`;
+        }
+
+
         // Fonction pour animer les cartes de métrique
         function animateMetricUpdate(element) {
             element.classList.remove('pulse-effect');
@@ -390,10 +422,13 @@
         }
 
         // --- FONCTION DE CALCUL HAUSSIER ---
-        function calculateUpsideScenario(currentUUR, currentCAU, currentPrice, totalOC) {
+        function calculateUpsideScenario(currentUUR, currentCAU, currentBuyback, currentPrice, totalOC) {
             const targetUUR = currentUUR * UPSIDE_UUR_MULTIPLIER;
             const targetCAU = currentCAU * UPSIDE_CAU_MULTIPLIER;
-            const targetMCJustifiedUSD = targetUUR * targetCAU;
+            
+            // La MC Justifiée cible inclut le rachat (Buyback)
+            const targetMCJustifiedUSD = (targetUUR * targetCAU) + currentBuyback; 
+            
             const targetOC = totalOC * (1 - UPSIDE_BURN_RATE); 
             const targetVTI = targetMCJustifiedUSD / targetOC;
             const gainMultiple = targetVTI / currentPrice;
@@ -410,6 +445,7 @@
             // Lecture des valeurs des réglettes
             const currentPrice = parseFloat(currentPriceSlider.value); // NOUVELLE VALEUR DYNAMIQUE
             const cauUSD = parseInt(cauSlider.value);
+            const dovBuybackUSD = parseInt(dovBuybackSlider.value); // NOUVELLE VALEUR
             const uurBase = parseInt(uurBaseSlider.value);
             const botPercent = parseFloat(botPercentSlider.value) / 100;
             const dovNewUsers = parseInt(dovGrowthSlider.value);
@@ -424,6 +460,8 @@
             // Mise à jour des labels des réglettes (avec formatage)
             currentPriceValueDisplay.textContent = `$${currentPrice.toFixed(4)}`; // 4 décimales pour le prix
             cauValueDisplay.textContent = `$${cauUSD}`;
+            dovBuybackValueDisplay.textContent = dovBuybackUSD.toLocaleString('fr-FR', {style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0}); // Affichage du rachat
+
             uurBaseValue.textContent = uurBase.toLocaleString('fr-FR');
             botPercentValue.textContent = `${(botPercent * 100).toFixed(0)}%`;
             dovGrowthValue.textContent = dovNewUsers.toLocaleString('fr-FR');
@@ -444,7 +482,10 @@
             const dmsWAXP = stakingUurBase + rpcStakingWAXP; 
 
             // 3. Calcul de la Market Cap Justifiée (VTI)
-            const mcJustifiedUSD = finalUUR * cauUSD;
+            // NOUVEAU CALCUL: MC Justifiée = (Utilité UUR) + (Rachat Annuel DoV)
+            const uurUtilityUSD = finalUUR * cauUSD;
+            const mcJustifiedUSD = uurUtilityUSD + dovBuybackUSD;
+            
             const effectiveOC = Math.max(1, OC_WAXP - dmsWAXP);
             const newVTI = mcJustifiedUSD / effectiveOC;
 
@@ -460,7 +501,7 @@
             const delta = ((newVTI - currentPrice) / currentPrice) * 100; // Utilise le prix dynamique
             
             // 7. Calcul du Potentiel Haussier (Upside Scenario)
-            const upside = calculateUpsideScenario(finalUUR, cauUSD, currentPrice, OC_WAXP); // Utilise le prix dynamique
+            const upside = calculateUpsideScenario(finalUUR, cauUSD, dovBuybackUSD, currentPrice, OC_WAXP); // Utilise le prix dynamique
 
 
             // --- MISE À JOUR DU DOM ---
@@ -477,7 +518,7 @@
 
             // Mise à jour VTI & MC Justifiée
             vtiResult.textContent = `$${newVTI.toFixed(6)}`; // 6 décimales pour la précision
-            mcJustified.textContent = `$${(mcJustifiedUSD / 1000000).toFixed(1)} M`;
+            mcJustified.textContent = formatUSD(mcJustifiedUSD); // Utilise la fonction de formatage pour USD
             totalUUR.textContent = finalUUR.toLocaleString('fr-FR');
 
 
@@ -521,10 +562,10 @@
         }
 
         // --- ÉVÉNEMENTS ---
-        // Liste de toutes les réglettes et le NOUVEL input number
+        // Liste de toutes les réglettes et l'input number
         const controls = [
             currentPriceSlider,
-            cauSlider, uurBaseSlider, botPercentSlider, dovGrowthSlider, 
+            cauSlider, dovBuybackSlider, uurBaseSlider, botPercentSlider, dovGrowthSlider, 
             stakingCostSlider, rpcStakingInput, avgWaxpSlider, afkLiquidationSlider
         ];
         
