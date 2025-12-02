@@ -56,6 +56,16 @@
             -webkit-appearance: none;
             margin-top: 10px;
         }
+        input[type=number] {
+            background-color: #334155;
+            color: #e2e8f0;
+            border: 1px solid #475569;
+            padding: 8px;
+            border-radius: 8px;
+            width: 100%;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
         .risk-metric {
             font-size: 1.8rem;
             font-weight: 700;
@@ -95,9 +105,10 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-10">
             <!-- Prix Actuel & Market Cap -->
             <div class="card col-span-1 border-l-4 border-cyan-400">
-                <p class="text-lg font-medium text-gray-400">Prix Marché Actuel</p>
-                <p class="metric-value text-green-400">$0.009</p>
-                <p class="text-sm text-gray-500">Market Cap: $44 M</p>
+                <p class="text-lg font-medium text-gray-400">Prix Marché Actuel (PMA)</p>
+                <!-- L'ID a été ajouté pour rendre cette valeur dynamique -->
+                <p id="current-price-display" class="metric-value text-green-400">$0.009</p>
+                <p class="text-sm text-gray-500">Market Cap: <span id="market-cap-display">$44 M</span></p>
             </div>
             
             <!-- VTI CALCULÉE (Animation & Focus) -->
@@ -109,7 +120,7 @@
             
             <!-- Écart (Animation & Focus) -->
             <div id="delta-card" class="card col-span-1 border-l-4 border-yellow-400">
-                <p class="text-lg font-medium text-gray-400">Écart vs Prix Actuel</p>
+                <p class="text-lg font-medium text-gray-400">Écart VTI vs PMA</p>
                 <p id="delta-percent" class="metric-value text-yellow-400">0.0%</p>
                 <p class="text-sm text-gray-500">Total UUR (Net Bots): <span id="total-uur">250,000</span></p>
             </div>
@@ -180,7 +191,7 @@
             </div>
 
             <!-- GROUPE 2: Facteurs de Dilution et de Risque -->
-            <div class="slider-group p-6 bg-gray-700/30 rounded-xl border-l-4 border-pink-400">
+            <div class="slider-group p-6 mb-8 bg-gray-700/30 rounded-xl border-l-4 border-pink-400">
                 <h3 class="text-xl font-bold text-pink-400 mb-4">Facteurs de Dilution (DMS) et Risque de Liquidité</h3>
 
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
@@ -195,17 +206,26 @@
                         </p>
                     </div>
 
-                    <!-- Réglette 5: Staking RPC/Infrastructure & Vote Passif -->
-                    <div>
-                        <label for="rpc-staking-slider" class="block font-medium text-lg text-gray-300 mb-2">
-                            5. Staking RPC/Vote/Infra (Bloqué)
+                    <!-- Réglette 5: Staking RPC/Infrastructure & Vote Passif (UTILISE INPUT NUMBER) -->
+                    <div class="col-span-1">
+                        <label for="rpc-staking-number-input" class="block font-medium text-lg text-gray-300 mb-2">
+                            5. Staking RPC/Vote/Infra (WAXP Bloqué)
                         </label>
-                        <input type="range" id="rpc-staking-slider" min="1000000" max="3000000000" step="100000000" value="1500000000">
+                        <input 
+                            type="number" 
+                            id="rpc-staking-number-input" 
+                            min="100000000" 
+                            max="4500000000" 
+                            step="100000" 
+                            value="1600000000"
+                            class="mb-2"
+                        >
                         <p class="text-sm text-gray-400 mt-2">
-                            <span id="rpc-staking-value" class="font-bold text-pink-400">1,500,000,000</span> WAXP bloqué
+                            Valeur saisie : <span id="rpc-staking-value" class="font-bold text-pink-400">1,600,000,000</span> WAXP
                         </p>
+                        <p class="text-xs text-gray-500 mt-1">Saisissez la valeur exacte ou utilisez les flèches (step 100k).</p>
                     </div>
-
+                    
                     <!-- Réglette 6: WAXP Moyen par UUR (AFK inclus) -->
                     <div>
                         <label for="avg-waxp-slider" class="block font-medium text-lg text-gray-300 mb-2">
@@ -229,6 +249,24 @@
                     </div>
                 </div>
             </div>
+            
+            <!-- GROUPE 3: Facteur Externe (Prix Marché Actuel) -->
+            <div class="slider-group p-6 mt-8 bg-gray-700/30 rounded-xl border-l-4 border-cyan-400">
+                <h3 class="text-xl font-bold text-cyan-400 mb-4">Facteur Externe: Prix Marché Actuel</h3>
+                
+                <!-- Réglette 8: Prix Marché Actuel (PMA) -->
+                <div class="mb-4">
+                    <label for="current-price-slider" class="block font-medium text-lg text-gray-300 mb-2">
+                        8. Prix Marché Actuel (PMA) en USD
+                    </label>
+                    <!-- Plage ajustée pour une bonne simulation -->
+                    <input type="range" id="current-price-slider" min="0.001" max="0.150" step="0.0005" value="0.009">
+                    <p class="text-sm text-gray-400 mt-2">
+                        Valeur de simulation : <span id="current-price-value" class="font-bold text-green-400">$0.009</span>
+                    </p>
+                </div>
+            </div>
+            
         </div>
 
         <!-- Section 3: Visualisation de la Dilution et Upside -->
@@ -278,7 +316,7 @@
     <script>
         // --- CONSTANTES CLÉS (Basées sur l'analyse) ---
         const OC_WAXP = 4500000000; // Offre Circulante WAXP
-        const CURRENT_PRICE = 0.009; // Prix Marché Actuel
+        // const CURRENT_PRICE = 0.009; // Ancien prix fixe, maintenant contrôlé par la réglette
 
         // --- CONSTANTES DE SCÉNARIO HAUSSIER (Formule demandée) ---
         const UPSIDE_UUR_MULTIPLIER = 2.0; // 2x UUR Net
@@ -288,13 +326,21 @@
         // --- ÉLÉMENTS DU DOM ---
         const vtiCard = document.getElementById('vti-card'); // Pour l'animation
         const deltaCard = document.getElementById('delta-card'); // Pour l'animation
+        
+        // NOUVELLES RÉGLETTES DE PRIX
+        const currentPriceSlider = document.getElementById('current-price-slider');
+        const currentPriceValueDisplay = document.getElementById('current-price-value');
+        const currentPriceDisplay = document.getElementById('current-price-display'); // Le grand chiffre dans la carte
+        const marketCapDisplay = document.getElementById('market-cap-display'); // Le market cap dans la carte
+        
         const cauSlider = document.getElementById('cau-slider');
         const cauValueDisplay = document.getElementById('cau-value');
         const uurBaseSlider = document.getElementById('uur-base-slider');
         const botPercentSlider = document.getElementById('bot-percent-slider');
         const dovGrowthSlider = document.getElementById('dov-growth-slider');
         const stakingCostSlider = document.getElementById('staking-cost-slider');
-        const rpcStakingSlider = document.getElementById('rpc-staking-slider'); 
+        // Remplacement de la réglette range par un input number
+        const rpcStakingInput = document.getElementById('rpc-staking-number-input'); 
         const avgWaxpSlider = document.getElementById('avg-waxp-slider');
         const afkLiquidationSlider = document.getElementById('afk-liquidation-slider');
 
@@ -330,7 +376,7 @@
                 return (number / 1000000000).toFixed(decimals) + ' Milliards';
             }
             if (number >= 1000000) {
-                return (number / 1000000).toFixed(decimals) + ' Millions';
+                return (number / 1000000).toFixed(decimals) + ' M'; // Raccourci M pour Millions
             }
             return number.toLocaleString('fr-FR');
         }
@@ -362,22 +408,30 @@
         // --- FONCTION DE CALCUL PRINCIPALE ---
         function calculateVTI() {
             // Lecture des valeurs des réglettes
+            const currentPrice = parseFloat(currentPriceSlider.value); // NOUVELLE VALEUR DYNAMIQUE
             const cauUSD = parseInt(cauSlider.value);
             const uurBase = parseInt(uurBaseSlider.value);
             const botPercent = parseFloat(botPercentSlider.value) / 100;
             const dovNewUsers = parseInt(dovGrowthSlider.value);
             const minStakingWAXP = parseInt(stakingCostSlider.value); 
-            const rpcStakingWAXP = parseInt(rpcStakingSlider.value); 
+            
+            // Lecture de la valeur du champ numérique (plus fiable pour la précision)
+            const rpcStakingWAXP = parseInt(rpcStakingInput.value || 0); 
+            
             const avgWaxpPerUUR = parseInt(avgWaxpSlider.value);
             const afkLiquidationRate = parseFloat(afkLiquidationSlider.value) / 100;
 
             // Mise à jour des labels des réglettes (avec formatage)
+            currentPriceValueDisplay.textContent = `$${currentPrice.toFixed(4)}`; // 4 décimales pour le prix
             cauValueDisplay.textContent = `$${cauUSD}`;
             uurBaseValue.textContent = uurBase.toLocaleString('fr-FR');
             botPercentValue.textContent = `${(botPercent * 100).toFixed(0)}%`;
             dovGrowthValue.textContent = dovNewUsers.toLocaleString('fr-FR');
             stakingCostValue.textContent = minStakingWAXP.toLocaleString('fr-FR');
-            rpcStakingValue.textContent = formatLargeNumber(rpcStakingWAXP, 0); // Pas de décimales pour les WAXP
+            
+            // Affichage de la valeur RPC Staking mise à jour
+            rpcStakingValue.textContent = rpcStakingWAXP.toLocaleString('fr-FR'); 
+            
             avgWaxpValue.textContent = avgWaxpPerUUR.toLocaleString('fr-FR');
             afkLiquidationValue.textContent = `${(afkLiquidationRate * 100).toFixed(0)}%`;
 
@@ -397,16 +451,16 @@
             // 4. Calcul du Risque de Liquidité
             const totalWaxpHeld = uurBase * avgWaxpPerUUR;
             const potentialSellingWaxp = totalWaxpHeld * afkLiquidationRate;
-            const potentialSellingUSD = potentialSellingWaxp * CURRENT_PRICE;
+            const potentialSellingUSD = potentialSellingWaxp * currentPrice; // Utilise le prix dynamique
 
             // 5. Calcul du % de DMS
             const dmsPercent = (dmsWAXP / OC_WAXP) * 100;
 
             // 6. Calcul de l'écart avec le prix actuel
-            const delta = ((newVTI - CURRENT_PRICE) / CURRENT_PRICE) * 100;
+            const delta = ((newVTI - currentPrice) / currentPrice) * 100; // Utilise le prix dynamique
             
             // 7. Calcul du Potentiel Haussier (Upside Scenario)
-            const upside = calculateUpsideScenario(finalUUR, cauUSD, CURRENT_PRICE, OC_WAXP);
+            const upside = calculateUpsideScenario(finalUUR, cauUSD, currentPrice, OC_WAXP); // Utilise le prix dynamique
 
 
             // --- MISE À JOUR DU DOM ---
@@ -415,10 +469,17 @@
             animateMetricUpdate(vtiCard);
             animateMetricUpdate(deltaCard);
 
-            // Mise à jour VTI & MC
+            // Mise à jour Prix Actuel & Market Cap
+            currentPriceDisplay.textContent = `$${currentPrice.toFixed(4)}`;
+            const marketCapUSD = OC_WAXP * currentPrice;
+            marketCapDisplay.textContent = `$${(marketCapUSD / 1000000).toFixed(1)} M`;
+
+
+            // Mise à jour VTI & MC Justifiée
             vtiResult.textContent = `$${newVTI.toFixed(6)}`; // 6 décimales pour la précision
             mcJustified.textContent = `$${(mcJustifiedUSD / 1000000).toFixed(1)} M`;
             totalUUR.textContent = finalUUR.toLocaleString('fr-FR');
+
 
             // Mise à jour des affichages d'offre
             ocDisplay.textContent = formatLargeNumber(OC_WAXP, 1);
@@ -460,8 +521,14 @@
         }
 
         // --- ÉVÉNEMENTS ---
-        const sliders = [cauSlider, uurBaseSlider, botPercentSlider, dovGrowthSlider, stakingCostSlider, rpcStakingSlider, avgWaxpSlider, afkLiquidationSlider];
-        sliders.forEach(slider => slider.addEventListener('input', calculateVTI)); 
+        // Liste de toutes les réglettes et le NOUVEL input number
+        const controls = [
+            currentPriceSlider,
+            cauSlider, uurBaseSlider, botPercentSlider, dovGrowthSlider, 
+            stakingCostSlider, rpcStakingInput, avgWaxpSlider, afkLiquidationSlider
+        ];
+        
+        controls.forEach(control => control.addEventListener('input', calculateVTI)); 
 
         // Initialisation avec les valeurs par défaut
         calculateVTI(); 
